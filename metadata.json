@@ -1,0 +1,6 @@
+{
+  "name": "CampusFind",
+  "description": "AI-powered campus lost and found property recovery platform featuring neural matching, zero-knowledge verification, and campus dispatch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
