@@ -66,7 +66,7 @@ export function HomeScreen({
 
         {/* Subtitle */}
         <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mx-auto font-normal leading-relaxed mb-8">
-          CampusFind uses AI to connect lost and found items — even when you don't have a photo. Built
+          CampusFind uses Machine Learning Algorithms to connect lost and found items — even when you don't have a photo. Built
           for instant student peace of mind.
         </p>
 
@@ -115,9 +115,9 @@ export function HomeScreen({
           <div className="bg-slate-50/80 px-4 sm:px-6 py-3 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-blue-600" />
-              <span className="font-bold text-slate-900">Neural Matching Engine v2.4</span>
+              <span className="font-bold text-slate-900">Ml Modal</span>
               <span className="bg-slate-200/80 text-slate-700 font-mono text-[11px] px-2 py-0.5 rounded">
-                Stream ID: CF-9924-NYU
+                
               </span>
             </div>
 

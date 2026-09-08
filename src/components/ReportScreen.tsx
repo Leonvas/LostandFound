@@ -108,7 +108,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
           Tell us what you lost
         </h1>
         <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-          The more precise details you provide, the faster our neural spatial matching engine reunites
+          The more precise details you provide, the faster our algorithms matching engine reunites
           you with your property.
         </p>
 
@@ -287,7 +287,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
           </div>
 
           {/* Context Helper Card */}
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
+         {/* <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
             <span className="text-base shrink-0">💡</span>
             <div className="leading-relaxed">
               <strong className="font-semibold">Category Context Helper: Wallets.</strong> Since you
@@ -295,7 +295,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
               compartments guarantees a 100% indisputable claim match when picked up by Campus
               Dispatch.
             </div>
-          </div>
+          </div> /*}
 
           {/* Two Side-by-Side Verification Textareas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
