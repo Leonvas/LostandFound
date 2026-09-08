@@ -340,7 +340,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
                 className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white leading-relaxed font-normal"
               />
               <p className="text-[11px] text-slate-500 leading-snug">
-                Our image vision model maps these physical defects when intake officers process found
+                Our ML model maps these physical defects when intake officers process found
                 objects.
               </p>
             </div>
