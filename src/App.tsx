@@ -61,50 +61,38 @@ export default function App() {
   }, []);
 
   // Handle New Lost Item Report
-  const handleCreateReport = (reportData: Partial<LostItemReport>) => {
-    const newReport: LostItemReport = {
-      id: `LOST-NYU-${Math.floor(8820 + Math.random() * 100)}`,
-      name: reportData.name || 'Personal Item',
-      category: reportData.category || 'Accessories',
-      color: reportData.color || 'Dark',
-      brand: reportData.brand || 'Custom',
-      material: reportData.material || 'Standard',
-      dateLost: reportData.dateLost || 'Today',
-      timeRange: reportData.timeRange || '10:00 AM - 12:00 PM',
-      building: reportData.building || 'Bobst Central Library',
-      subLocation: reportData.subLocation || 'Main Floor',
-      geoPin: { lat: 40.7295, lng: -73.9972 },
-      internalIdentifiers: reportData.internalIdentifiers || '',
-      wearMarks: reportData.wearMarks || '',
-      hasPhoto: reportData.hasPhoto || false,
-      reportedAt: 'Just now',
-      status: 'match_found',
-      matchConfidence: 89,
-      matchedItemId: 'FND-NYU-7422',
-    };
-
-    setLostReports([newReport, ...lostReports]);
-
-    // Add match notification
-    const newNotif: NotificationItem = {
-      id: `n-${Date.now()}`,
-      title: 'Neural Engine Match Found (89%)',
-      description: `Your reported ${newReport.name} matched Found Item #FND-NYU-7422 at Bobst Library!`,
-      time: 'Just now',
-      read: false,
-      type: 'match',
-      actionScreen: 'dashboard',
-    };
-    setNotifications([newNotif, ...notifications]);
-
-    showToast(`Lost item report ${newReport.id} registered! Live neural match found (89%).`);
-  };
+const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
+  const res = await fetch('http://localhost:8000/lost-reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reportData),
+  });
+  const { report, matches } = await res.json();
+  setLostReports([report, ...lostReports]);
+  // `matches` is your ranked list — feed the top one into the match-found flow
+  // instead of the hardcoded matchConfidence: 89 that's there now
+};
 
   // Handle Found Item submission
-  const handleFoundItemSubmit = (item: any) => {
-    CURRENT_USER.karmaPoints += 150;
-    showToast(`Found item logged! +150 Karma Credits added to your NYU NetID.`);
-  };
+ const handleFoundItemSubmit = async (item: any) => {
+  const res = await fetch('http://localhost:8000/found-items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: item.name,
+      category: item.category,
+      found_location: item.location,
+    }),
+  });
+
+  if (!res.ok) {
+    showToast('Something went wrong saving your found item.');
+    return;
+  }
+
+  CURRENT_USER.karmaPoints += 150;
+  showToast(`Found item logged! +150 Karma Credits added to your NYU NetID.`);
+};
 
   // Handle Ownership Verification success
   const handleVerificationSuccess = (itemId: string) => {
