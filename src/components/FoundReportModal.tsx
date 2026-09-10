@@ -29,6 +29,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
         name: title || 'Found Item',
         category,
         location: `${location} - ${room}`,
+        custodian: handoverPref,
       });
     }, 700);
   };

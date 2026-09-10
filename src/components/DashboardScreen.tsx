@@ -55,10 +55,6 @@ export function DashboardScreen({
       {/* Top Welcome Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold px-2.5 py-0.5 rounded-full border border-blue-100 uppercase tracking-wider mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
-            <span>Student Net Verified • Node #NYU-99420</span>
-          </div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             Good morning, {CURRENT_USER.name} 👋
           </h1>
@@ -100,7 +96,7 @@ export function DashboardScreen({
             className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 shrink-0 shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>+ Report Lost Item</span>
+            <span> Report Lost Item</span>
           </button>
         </div>
 

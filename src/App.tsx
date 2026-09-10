@@ -101,20 +101,20 @@ export default function App() {
     const res = await fetch(`${API_BASE}/lost-reports`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: reportData.name,
-        category: reportData.category,
-        color: reportData.color,
-        brand: reportData.brand,
-        material: reportData.material,
-        date_lost: reportData.dateLost,
-        time_range: reportData.timeRange,
-        building: reportData.building,
-        sub_location: reportData.subLocation,
-        internal_identifiers: reportData.internalIdentifiers,
-        wear_marks: reportData.wearMarks,
-        has_photo: reportData.hasPhoto || false,
-      }),
+    body: JSON.stringify({
+      name: reportData.name,
+      category: reportData.category,
+      color: reportData.color,
+      brand: reportData.brand,
+      material: reportData.material,
+      date_lost: reportData.dateLost,
+      time_range: reportData.timeRange,
+      building: reportData.building,
+      sub_location: reportData.subLocation,
+      internal_identifiers: reportData.internalIdentifiers,
+      wear_marks: reportData.wearMarks,
+      has_photo: reportData.hasPhoto || false,
+    }),
     });
 
     if (!res.ok) {
@@ -178,11 +178,11 @@ export default function App() {
     const res = await fetch(`${API_BASE}/found-items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: item.name,
-        category: item.category,
-        found_location: item.location,
-      }),
+     body: JSON.stringify({
+      name: item.name,
+      category: item.category,
+      found_location: item.location,
+    }),
     });
 
     if (!res.ok) {

@@ -12,7 +12,7 @@ app = FastAPI(title="Campus Lost & Found API")
 # Vite dev server runs on :3000 per this repo's package.json
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):3000",
     allow_methods=["*"],
     allow_headers=["*"],
 )
