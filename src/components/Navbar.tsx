@@ -24,7 +24,6 @@ export function Navbar({
   const navItems: { id: ScreenType; label: string; badge?: number }[] = [
     { id: 'home', label: 'Home' },
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'browse', label: 'Browse Items' },
     { id: 'reports', label: 'My Reports' },
     { id: 'match-hub', label: 'AI Match Hub' },
     { id: 'dashboard', label: 'Notifications', badge: unreadCount },

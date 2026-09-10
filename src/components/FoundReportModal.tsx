@@ -42,7 +42,6 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
             <HandHeart className="w-5 h-5 text-emerald-400" />
             <div>
               <h3 className="font-bold text-sm sm:text-base">Turn in a Found Item</h3>
-              <p className="text-[11px] text-slate-400">Earn +150 Karma Credits for good citizenship</p>
             </div>
           </div>
           <button
@@ -167,7 +166,6 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
                   </>
                 ) : (
                   <>
-                    <span>Submit & Claim Karma</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
@@ -180,10 +178,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h4 className="text-lg font-bold text-slate-900">Thank you for helping campus!</h4>
-            <p className="text-xs text-slate-600 max-w-sm mx-auto">
-              You've been credited <strong>+150 Karma points</strong>. Staff has been alerted to
-              intake the item into secure vault custody.
-            </p>
+  
             <button
               onClick={onClose}
               className="w-full bg-slate-900 hover:bg-black text-white text-xs font-semibold py-2.5 rounded-lg"

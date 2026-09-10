@@ -43,12 +43,6 @@ export function Footer({ onNavigate }: FooterProps) {
               Live Dashboard
             </button>
             <button
-              onClick={() => onNavigate('browse')}
-              className="hover:text-blue-600 transition-colors text-left"
-            >
-              Campus Inventory
-            </button>
-            <button
               onClick={() => onNavigate('report')}
               className="hover:text-blue-600 transition-colors text-left"
             >

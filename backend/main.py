@@ -54,6 +54,25 @@ class FoundItemIn(BaseModel):
     building: str | None = None
     user_id: str | None = None
 
+@app.get("/dashboard/stats")
+def get_dashboard_stats():
+    active = (
+        supabase.table("lost_reports").select("id", count="exact")
+        .neq("status", "returned").execute()
+    )
+    matches = (
+        supabase.table("lost_reports").select("id", count="exact")
+        .eq("status", "match_found").execute()
+    )
+    returned = (
+        supabase.table("lost_reports").select("id", count="exact")
+        .eq("status", "returned").execute()
+    )
+    return {
+        "active_reports": active.count or 0,
+        "possible_matches": matches.count or 0,
+        "returned_items": returned.count or 0,
+    }
 
 @app.get("/")
 def home():

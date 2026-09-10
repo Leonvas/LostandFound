@@ -6,7 +6,6 @@ import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { ReportScreen } from './components/ReportScreen';
 import { DashboardScreen } from './components/DashboardScreen';
-import { BrowseItemsScreen } from './components/BrowseItemsScreen';
 import { MyReportsScreen } from './components/MyReportsScreen';
 import { AdminPortal } from './components/AdminPortal';
 import { VerificationModal } from './components/VerificationModal';
@@ -82,6 +81,20 @@ export default function App() {
       setToastMessage(null);
     }, 4500);
   };
+
+
+  const [dashboardStats, setDashboardStats] = useState({
+  active_reports: 0,
+  possible_matches: 0,
+  returned_items: 0,
+});
+
+useEffect(() => {
+  fetch(`${API_BASE}/dashboard/stats`)
+    .then((res) => res.json())
+    .then(setDashboardStats)
+    .catch(() => {});
+}, [lostReports]);
 
   // Keyboard shortcut for Quick Track
   useEffect(() => {
@@ -260,6 +273,7 @@ export default function App() {
 
         {currentScreen === 'dashboard' && (
           <DashboardScreen
+          
             onNavigate={(screen) => {
               setCurrentScreen(screen);
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -278,19 +292,8 @@ export default function App() {
             foundItem={foundItem ?? EMPTY_FOUND_ITEM}
             secondaryItem={secondaryItem ?? EMPTY_FOUND_ITEM}
             recoveryCenters={RECOVERY_CENTERS}
-          />
-        )}
-
-        {currentScreen === 'browse' && (
-          <BrowseItemsScreen
-            onSelectFoundItem={(item) => {
-              setVerifyTargetItem(item);
-              setIsVerifyModalOpen(true);
-            }}
-            onOpenReportModal={() => {
-              setCurrentScreen('report');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            
+            stats={dashboardStats}
           />
         )}
 

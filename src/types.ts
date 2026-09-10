@@ -1,4 +1,4 @@
-export type ScreenType = 'home' | 'dashboard' | 'report' | 'browse' | 'reports' | 'match-hub' | 'admin';
+export type ScreenType = 'home' | 'dashboard' | 'report' | 'reports' | 'match-hub' | 'admin';
 
 export interface LostItemReport {
   id: string;

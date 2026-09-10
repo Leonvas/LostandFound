@@ -35,6 +35,7 @@ interface DashboardScreenProps {
   foundItem: FoundItemAsset;
   secondaryItem: FoundItemAsset;
   recoveryCenters: RecoveryCenter[];
+  stats: { active_reports: number; possible_matches: number; returned_items: number };
 }
 
 export function DashboardScreen({
@@ -47,8 +48,12 @@ export function DashboardScreen({
   foundItem,
   secondaryItem,
   recoveryCenters,
+  stats,
 }: DashboardScreenProps) {
   const [activeBeacon, setActiveBeacon] = useState('bobst');
+
+  const hour = new Date().getHours();
+const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-20">
@@ -56,7 +61,7 @@ export function DashboardScreen({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-            Good morning, {CURRENT_USER.name} 👋
+           {timeGreeting}, {CURRENT_USER.name} 👋
           </h1>
           <p className="text-sm text-slate-600 mt-1">
             Let's get your belongings back. You have{' '}
@@ -103,12 +108,9 @@ export function DashboardScreen({
         {/* Card 2: I Found Something */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs hover:shadow-md hover:border-emerald-200 transition-all flex items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
-              <span>+150 Karma Credits</span>
-            </div>
             <h3 className="text-lg font-bold text-slate-900">I Found Something</h3>
             <p className="text-xs text-slate-500">
-              Report an item you found on campus. Earn campus dining tokens & help a peer.
+              Report an item you found on campus.
             </p>
           </div>
           <button
@@ -130,7 +132,7 @@ export function DashboardScreen({
             <Radio className="w-3.5 h-3.5 text-blue-600" />
           </div>
           <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
-            {CURRENT_USER.activeReportsCount}
+            {stats.active_reports}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 truncate">
             Item tracking: {lostReport.name}
@@ -145,7 +147,7 @@ export function DashboardScreen({
             <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
           </div>
           <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">
-            {CURRENT_USER.possibleMatchesCount}
+            {stats.possible_matches}
           </div>
           <div className="text-[11px] text-emerald-700 font-medium mt-1">
             1 high confidence (89%)
@@ -162,18 +164,6 @@ export function DashboardScreen({
             {CURRENT_USER.returnedItemsCount}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">Resolved (100% claim rate)</div>
-        </div>
-
-        {/* Stat 4 */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
-            <span>Karma Credits</span>
-            <span className="text-xs">☕</span>
-          </div>
-          <div className="text-2xl font-extrabold text-slate-900 tabular-nums">
-            ₹{CURRENT_USER.karmaPoints}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Redeemable at Campus Cafe</div>
         </div>
       </div>
 
@@ -551,13 +541,6 @@ export function DashboardScreen({
                 </div>
               ))}
             </div>
-
-            <button
-              onClick={() => onNavigate('browse')}
-              className="w-full text-center py-2 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50/60 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-            >
-              📞 Contact Campus Dispatch Hub
-            </button>
           </div>
 
           {/* ZERO TRUST CLAIM HANDOVER PROMISE */}

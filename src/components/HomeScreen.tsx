@@ -400,13 +400,13 @@ export function HomeScreen({
                 <span>Report an Item</span>
               </button>
 
-              <button
-                onClick={() => onNavigate('browse')}
-                className="bg-white/10 hover:bg-white/15 text-white border border-white/20 font-semibold text-sm px-6 py-3.5 rounded-full flex items-center gap-2 transition-all cursor-pointer"
-              >
-                <span>Browse 142 Items in Custody</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+         <button
+  onClick={() => onNavigate('dashboard')}
+  className="bg-white/10 hover:bg-white/15 text-white border border-white/20 font-semibold text-sm px-6 py-3.5 rounded-full flex items-center gap-2 transition-all cursor-pointer"
+>
+  <span>Open Dashboard</span>
+  <ArrowRight className="w-4 h-4" />
+</button>
             </div>
           </div>
         </div>
