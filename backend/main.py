@@ -12,7 +12,7 @@ app = FastAPI(title="Campus Lost & Found API")
 # Vite dev server runs on :3000 per this repo's package.json
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,7 +77,14 @@ def list_found_items():
 @app.post("/found-items")
 def create_found_item(item: FoundItemIn):
     response = supabase.table("found_items").insert(item.model_dump()).execute()
-    return response.data[0]
+    new_item = response.data[0]
+
+    # Check if this newly found item matches any open lost report
+    matches = supabase.rpc(
+        "find_matches_for_found", {"item_id": new_item["id"]}
+    ).execute()
+
+    return {"item": new_item, "matches": matches.data}
 
 
 # ---- Lost reports (what ReportScreen submits) ----

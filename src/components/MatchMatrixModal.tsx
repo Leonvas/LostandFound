@@ -1,14 +1,68 @@
-import { MATCH_MATRIX_VECTORS } from '../data/mockData';
-import { Sparkles, X, ShieldCheck, Cpu, ArrowRight, Lock, CheckCircle2 } from 'lucide-react';
+import { Sparkles, X, ShieldCheck, Cpu, ArrowRight } from 'lucide-react';
+import { LostItemReport, FoundItemAsset } from '../types';
 
 interface MatchMatrixModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProceedToVerify: () => void;
+  lostReport: LostItemReport | null;
+  foundItem: FoundItemAsset | null;
+  matchScore: number; // 0-100
 }
 
-export function MatchMatrixModal({ isOpen, onClose, onProceedToVerify }: MatchMatrixModalProps) {
+// Simple, honest per-field comparison — no fabricated vectors, just what the
+// matching function actually compares (name/category/color/material/building).
+function compareField(label: string, lostValue: string, foundValue: string) {
+  const a = (lostValue || '').trim().toLowerCase();
+  const b = (foundValue || '').trim().toLowerCase();
+  let score = 20;
+  if (a && b) {
+    if (a === b) score = 100;
+    else if (a.includes(b) || b.includes(a)) score = 65;
+    else score = 30;
+  }
+  return { label, lostValue: lostValue || '—', foundValue: foundValue || '—', score };
+}
+
+export function MatchMatrixModal({
+  isOpen,
+  onClose,
+  onProceedToVerify,
+  lostReport,
+  foundItem,
+  matchScore,
+}: MatchMatrixModalProps) {
   if (!isOpen) return null;
+
+  if (!lostReport || !foundItem) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+        <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 text-center space-y-3">
+          <Cpu className="w-8 h-8 text-slate-400 mx-auto" />
+          <h3 className="font-bold text-slate-900">No match to inspect yet</h3>
+          <p className="text-xs text-slate-500">
+            Once your report matches an item in custody, its comparison will show up here.
+          </p>
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const comparisons = [
+    compareField('Item Name', lostReport.name, foundItem.name),
+    compareField('Category', lostReport.category, foundItem.category),
+    compareField('Color', lostReport.color, foundItem.color),
+    compareField('Material', lostReport.material, foundItem.material),
+    compareField('Building', lostReport.building, foundItem.building),
+  ];
+
+  const roundedScore = Math.round(matchScore);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
@@ -21,13 +75,13 @@ export function MatchMatrixModal({ isOpen, onClose, onProceedToVerify }: MatchMa
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base">Neural Match Matrix Inspector</h3>
+                <h3 className="font-bold text-sm sm:text-base">Match Comparison</h3>
                 <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-emerald-500/30 font-bold">
-                  89% CONFIDENCE
+                  {roundedScore}% MATCH
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                Correlating Report #LOST-NYU-8821 ↔ Found Asset #FND-NYU-7422
+                Comparing report #{lostReport.id} ↔ found item #{foundItem.id}
               </p>
             </div>
           </div>
@@ -41,70 +95,40 @@ export function MatchMatrixModal({ isOpen, onClose, onProceedToVerify }: MatchMa
 
         {/* Body */}
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-          {/* Summary Box */}
-          <div className="bg-blue-50/80 border border-blue-100 rounded-xl p-4 text-xs text-blue-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <span className="font-bold block text-sm mb-0.5">
-                Deterministic Multi-Vector Evaluation
-              </span>
-              <p className="text-slate-600 text-[11px]">
-                Matching achieved without camera photo by computing 14 physical, temporal, and
-                micro-spatial cosine similarities.
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <div className="text-2xl font-extrabold text-blue-700 font-mono">14 / 14</div>
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
-                Vectors Aligned
-              </span>
-            </div>
+          <div className="bg-blue-50/80 border border-blue-100 rounded-xl p-4 text-xs text-blue-950">
+            <span className="font-bold block text-sm mb-0.5">Field-by-field comparison</span>
+            <p className="text-slate-600 text-[11px]">
+              This is what the matching engine actually compared — the overall score is a
+              weighted average of these fields' text similarity.
+            </p>
           </div>
 
-          {/* Vectors Breakdown List */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Primary Vector Correlations
-            </h4>
-
-            <div className="space-y-2.5">
-              {MATCH_MATRIX_VECTORS.map((vec) => (
-                <div
-                  key={vec.attribute}
-                  className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs hover:bg-white hover:border-blue-200 transition-all"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                      <span>{vec.attribute}</span>
-                      {vec.isPrivacyPreserved && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded">
-                          <Lock className="w-2.5 h-2.5" />
-                          Zero-Knowledge
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-400">Weight: {vec.weight}</span>
-                      <span className="font-mono font-bold text-emerald-600">{vec.score}%</span>
-                    </div>
+          <div className="space-y-2.5">
+            {comparisons.map((c) => (
+              <div
+                key={c.label}
+                className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs hover:bg-white hover:border-blue-200 transition-all"
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-slate-900">{c.label}</span>
+                  <span className="font-mono font-bold text-emerald-600">{c.score}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-white/70 p-2 rounded-lg border border-slate-100">
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase font-semibold">
+                      Your Report:
+                    </span>
+                    <span className="font-medium text-slate-800">{c.lostValue}</span>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-white/70 p-2 rounded-lg border border-slate-100">
-                    <div>
-                      <span className="text-slate-400 block text-[9px] uppercase font-semibold">
-                        Your Stated Vector:
-                      </span>
-                      <span className="font-medium text-slate-800">{vec.lostValue}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[9px] uppercase font-semibold">
-                        Campus Ingest Vector:
-                      </span>
-                      <span className="font-medium text-slate-800">{vec.foundValue}</span>
-                    </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9px] uppercase font-semibold">
+                      Found Item:
+                    </span>
+                    <span className="font-medium text-slate-800">{c.foundValue}</span>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -112,7 +136,7 @@ export function MatchMatrixModal({ isOpen, onClose, onProceedToVerify }: MatchMa
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200/80 flex items-center justify-between">
           <div className="text-xs text-slate-500 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>FERPA protected audit hash</span>
+            <span>Identity checked at pickup, not here</span>
           </div>
 
           <div className="flex items-center gap-2">

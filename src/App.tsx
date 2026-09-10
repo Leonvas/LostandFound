@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ScreenType, LostItemReport, FoundItemAsset, NotificationItem } from './types';
-import {
-  INITIAL_LOST_REPORT,
-  INITIAL_FOUND_ITEM,
-  SECONDARY_MATCH_CANDIDATE,
-  RECOVERY_CENTERS,
-  NOTIFICATIONS,
-  CURRENT_USER,
-} from './data/mockData';
+import { RECOVERY_CENTERS, NOTIFICATIONS, CURRENT_USER } from './data/mockData';
+import { adaptFoundItem } from './lib/adaptItems';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { ReportScreen } from './components/ReportScreen';
@@ -23,16 +17,57 @@ import { NotificationsDrawer } from './components/NotificationsDrawer';
 import { Footer } from './components/Footer';
 import { CheckCircle2, Sparkles, X } from 'lucide-react';
 
+const API_BASE = 'http://localhost:8000';
+
+// Placeholder shapes so screens that assume a report/match always exists
+// don't crash before any real data comes in. All fields blank — no fake
+// wallet/MacBook data — these just prevent undefined.property crashes.
+const EMPTY_LOST_REPORT: LostItemReport = {
+  id: '',
+  name: '',
+  category: '',
+  color: '',
+  brand: '',
+  material: '',
+  dateLost: '',
+  timeRange: '',
+  building: '',
+  subLocation: '',
+  geoPin: { lat: 0, lng: 0 },
+  internalIdentifiers: '',
+  wearMarks: '',
+  hasPhoto: false,
+  reportedAt: '',
+  status: 'scanning',
+};
+
+const EMPTY_FOUND_ITEM: FoundItemAsset = {
+  id: '',
+  name: '',
+  category: '',
+  color: '',
+  material: '',
+  foundLocation: '',
+  foundTimeAgo: '',
+  custodian: '',
+  storageLocker: '',
+  verificationLevel: '',
+  photoUrl: '',
+  identifiersPreview: '',
+  status: 'in_custody',
+  building: '',
+};
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
-  const [lostReports, setLostReports] = useState<LostItemReport[]>([INITIAL_LOST_REPORT]);
-  const [foundItem, setFoundItem] = useState<FoundItemAsset>(INITIAL_FOUND_ITEM);
-  const [secondaryItem, setSecondaryItem] = useState<FoundItemAsset>(SECONDARY_MATCH_CANDIDATE);
+  const [lostReports, setLostReports] = useState<LostItemReport[]>([]);
+  const [foundItem, setFoundItem] = useState<FoundItemAsset | null>(null);
+  const [secondaryItem, setSecondaryItem] = useState<FoundItemAsset | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>(NOTIFICATIONS);
 
   // Modals state
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
-  const [verifyTargetItem, setVerifyTargetItem] = useState<FoundItemAsset>(INITIAL_FOUND_ITEM);
+  const [verifyTargetItem, setVerifyTargetItem] = useState<FoundItemAsset | null>(null);
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
   const [isFoundModalOpen, setIsFoundModalOpen] = useState(false);
   const [isQuickTrackOpen, setIsQuickTrackOpen] = useState(false);
@@ -60,46 +95,114 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Handle New Lost Item Report
-const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
-  const res = await fetch('http://localhost:8000/lost-reports', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(reportData),
-  });
-  const { report, matches } = await res.json();
-  setLostReports([report, ...lostReports]);
-  // `matches` is your ranked list — feed the top one into the match-found flow
-  // instead of the hardcoded matchConfidence: 89 that's there now
-};
+  // Handle New Lost Item Report — posts to Supabase via FastAPI, then reacts
+  // to whatever the real matching function found (if anything).
+  const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
+    const res = await fetch(`${API_BASE}/lost-reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: reportData.name,
+        category: reportData.category,
+        color: reportData.color,
+        brand: reportData.brand,
+        material: reportData.material,
+        date_lost: reportData.dateLost,
+        time_range: reportData.timeRange,
+        building: reportData.building,
+        sub_location: reportData.subLocation,
+        internal_identifiers: reportData.internalIdentifiers,
+        wear_marks: reportData.wearMarks,
+        has_photo: reportData.hasPhoto || false,
+      }),
+    });
 
-  // Handle Found Item submission
- const handleFoundItemSubmit = async (item: any) => {
-  const res = await fetch('http://localhost:8000/found-items', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: item.name,
-      category: item.category,
-      found_location: item.location,
-    }),
-  });
+    if (!res.ok) {
+      showToast('Something went wrong submitting your report.');
+      return;
+    }
 
-  if (!res.ok) {
-    showToast('Something went wrong saving your found item.');
-    return;
-  }
+    const { report, matches } = await res.json();
+    const topMatch = matches?.[0];
+    // Trigram similarity score is 0-1; 0.3 is a reasonable "worth surfacing" floor — tune as you see real data.
+    const hasStrongMatch = !!topMatch && topMatch.match_score > 0.3;
 
-  CURRENT_USER.karmaPoints += 150;
-  showToast(`Found item logged! +150 Karma Credits added to your NYU NetID.`);
-};
+    const newReport: LostItemReport = {
+      id: report.id,
+      name: report.name,
+      category: report.category || '',
+      color: report.color || '',
+      brand: report.brand || '',
+      material: report.material || '',
+      dateLost: report.date_lost || '',
+      timeRange: report.time_range || '',
+      building: report.building || '',
+      subLocation: report.sub_location || '',
+      geoPin: { lat: 40.7295, lng: -73.9972 },
+      internalIdentifiers: report.internal_identifiers || '',
+      wearMarks: report.wear_marks || '',
+      hasPhoto: report.has_photo || false,
+      reportedAt: 'Just now',
+      status: hasStrongMatch ? 'match_found' : 'scanning',
+      matchConfidence: hasStrongMatch ? Math.round(topMatch.match_score * 100) : undefined,
+      matchedItemId: hasStrongMatch ? topMatch.id : undefined,
+    };
+
+    setLostReports((prev) => [newReport, ...prev]);
+
+    if (hasStrongMatch) {
+      setFoundItem(adaptFoundItem(topMatch));
+      if (matches[1]) setSecondaryItem(adaptFoundItem(matches[1]));
+
+      const newNotif: NotificationItem = {
+        id: `n-${Date.now()}`,
+        title: `Match Found (${newReport.matchConfidence}%)`,
+        description: `Your reported ${newReport.name} matched a found item${
+          newReport.building ? ` near ${newReport.building}` : ''
+        }.`,
+        time: 'Just now',
+        read: false,
+        type: 'match',
+        actionScreen: 'dashboard',
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+      showToast(`Report registered! A ${newReport.matchConfidence}% match was found.`);
+    } else {
+      showToast(`Report registered. We'll notify you if a match turns up.`);
+    }
+  };
+
+  // Handle Found Item submission — posts to Supabase, and checks (server-side)
+  // whether it matches any open lost report.
+  const handleFoundItemSubmit = async (item: any) => {
+    const res = await fetch(`${API_BASE}/found-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: item.name,
+        category: item.category,
+        found_location: item.location,
+      }),
+    });
+
+    if (!res.ok) {
+      showToast('Something went wrong saving your found item.');
+      return;
+    }
+
+    const { matches } = await res.json();
+    CURRENT_USER.karmaPoints += 150;
+
+    if (matches?.length) {
+      showToast(`Found item logged! It may match an existing lost report. +150 Karma Credits.`);
+    } else {
+      showToast(`Found item logged! +150 Karma Credits added to your NYU NetID.`);
+    }
+  };
 
   // Handle Ownership Verification success
   const handleVerificationSuccess = (itemId: string) => {
-    setFoundItem((prev) => ({
-      ...prev,
-      status: 'claimed',
-    }));
+    setFoundItem((prev) => (prev ? { ...prev, status: 'claimed' } : prev));
     setLostReports((prev) =>
       prev.map((r) => (r.matchedItemId === itemId ? { ...r, status: 'verified' } : r))
     );
@@ -140,8 +243,8 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
             }}
             onOpenFoundModal={() => setIsFoundModalOpen(true)}
             onInspectMatrix={() => setIsMatrixModalOpen(true)}
-            lostReport={lostReports[0]}
-            foundItem={foundItem}
+            lostReport={lostReports[0] ?? EMPTY_LOST_REPORT}
+            foundItem={foundItem ?? EMPTY_FOUND_ITEM}
           />
         )}
 
@@ -171,9 +274,9 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
               setIsVerifyModalOpen(true);
             }}
             onInspectMatrix={() => setIsMatrixModalOpen(true)}
-            lostReport={lostReports[0]}
-            foundItem={foundItem}
-            secondaryItem={secondaryItem}
+            lostReport={lostReports[0] ?? EMPTY_LOST_REPORT}
+            foundItem={foundItem ?? EMPTY_FOUND_ITEM}
+            secondaryItem={secondaryItem ?? EMPTY_FOUND_ITEM}
             recoveryCenters={RECOVERY_CENTERS}
           />
         )}
@@ -194,7 +297,7 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
         {currentScreen === 'reports' && (
           <MyReportsScreen
             reports={lostReports}
-            foundItem={foundItem}
+            foundItem={foundItem ?? EMPTY_FOUND_ITEM}
             onOpenReportModal={() => {
               setCurrentScreen('report');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -217,7 +320,7 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
       <VerificationModal
         isOpen={isVerifyModalOpen}
         onClose={() => setIsVerifyModalOpen(false)}
-        foundItem={verifyTargetItem}
+        foundItem={verifyTargetItem ?? EMPTY_FOUND_ITEM}
         onVerificationSuccess={handleVerificationSuccess}
       />
 
@@ -225,9 +328,14 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
         isOpen={isMatrixModalOpen}
         onClose={() => setIsMatrixModalOpen(false)}
         onProceedToVerify={() => {
-          setVerifyTargetItem(foundItem);
-          setIsVerifyModalOpen(true);
+          if (foundItem) {
+            setVerifyTargetItem(foundItem);
+            setIsVerifyModalOpen(true);
+          }
         }}
+        lostReport={lostReports[0] ?? null}
+        foundItem={foundItem}
+        matchScore={lostReports[0]?.matchConfidence ?? 0}
       />
 
       <FoundReportModal
@@ -241,7 +349,7 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
         onClose={() => setIsQuickTrackOpen(false)}
         onSelectItem={(item) => {
           setCurrentScreen('dashboard');
-          if (item.id === foundItem.id || item.matchedItemId) {
+          if (foundItem && (item.id === foundItem.id || item.matchedItemId)) {
             setVerifyTargetItem(foundItem);
             setIsVerifyModalOpen(true);
           }
@@ -281,4 +389,3 @@ const handleCreateReport = async (reportData: Partial<LostItemReport>) => {
     </div>
   );
 }
-

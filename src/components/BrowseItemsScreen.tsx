@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-//import { ALL_CAMPUS_ITEMS } from '../data/mockData';
+import { adaptFoundItem } from '../lib/adaptItems';
 import { FoundItemAsset } from '../types';
 import { Search, Filter, MapPin, Building, ShieldCheck, ArrowRight, ExternalLink } from 'lucide-react';
 
@@ -9,19 +9,20 @@ interface BrowseItemsScreenProps {
 }
 
 export function BrowseItemsScreen({ onSelectFoundItem, onOpenReportModal }: BrowseItemsScreenProps) {
-  const [items, setItems] = useState<FoundItemAsset[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    fetch('http://localhost:8000/found-items')
-      .then((res) => res.json())
-      .then(setItems);
-  }, []);
-
   const categories = ['all', 'Electronics', 'Wallet / Acc.', 'Keys', 'Bottles & Mugs'];
   const buildings = ['all', 'Bobst Central Library', 'Kimmel Center', 'Silver Center', 'Campus Safety HQ'];
+
+  const [items, setItems] = useState<FoundItemAsset[]>([]);
+
+useEffect(() => {
+  fetch('http://localhost:8000/found-items')
+    .then((res) => res.json())
+    .then((rows) => setItems(rows.map(adaptFoundItem)));
+}, []);
 
   const filtered = items.filter((item) => {
     const matchesCategory = selectedCategory === 'all' || item.category.toLowerCase().includes(selectedCategory.toLowerCase());

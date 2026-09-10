@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, X, MapPin, ArrowRight, ShieldCheck, CreditCard, Laptop, Key, Sparkles } from 'lucide-react';
-import { ALL_CAMPUS_ITEMS, INITIAL_LOST_REPORT } from '../data/mockData';
+import { adaptFoundItem } from '../lib/adaptItems';
 import { ScreenType } from '../types';
 
 interface QuickTrackModalProps {
@@ -28,7 +28,14 @@ export function QuickTrackModal({ isOpen, onClose, onSelectItem }: QuickTrackMod
 
   if (!isOpen) return null;
 
-  const filteredItems = ALL_CAMPUS_ITEMS.filter(
+  const [allItems, setAllItems] = useState<any[]>([]);
+useEffect(() => {
+  fetch('http://localhost:8000/found-items')
+    .then((res) => res.json())
+    .then((rows) => setAllItems(rows.map(adaptFoundItem)));
+}, []);
+
+  const filteredItems = allItems.filter(
     (item) =>
       item.name.toLowerCase().includes(query.toLowerCase()) ||
       item.id.toLowerCase().includes(query.toLowerCase()) ||
@@ -60,36 +67,6 @@ export function QuickTrackModal({ isOpen, onClose, onSelectItem }: QuickTrackMod
 
         {/* Results List */}
         <div className="p-2 max-h-80 overflow-y-auto divide-y divide-slate-100">
-          {/* Quick link to your own active report */}
-          <div
-            onClick={() => {
-              onSelectItem(INITIAL_LOST_REPORT);
-              onClose();
-            }}
-            className="p-3 rounded-xl hover:bg-blue-50/60 cursor-pointer flex items-center justify-between group transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                <CreditCard className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-900">{INITIAL_LOST_REPORT.name}</span>
-                  <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.2 rounded">
-                    YOUR REPORT
-                  </span>
-                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-1.5 py-0.2 rounded">
-                    89% MATCH
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3 h-3 text-slate-400" />
-                  <span>Bobst Central Library • {INITIAL_LOST_REPORT.id}</span>
-                </div>
-              </div>
-            </div>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-          </div>
 
           {filteredItems.map((item) => (
             <div

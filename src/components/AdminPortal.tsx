@@ -1,6 +1,5 @@
 import { useState, FormEvent } from 'react';
 import { ShieldCheck, KeyRound, CheckCircle2, QrCode, Search, RefreshCw, AlertCircle } from 'lucide-react';
-import { ALL_CAMPUS_ITEMS } from '../data/mockData';
 
 export function AdminPortal() {
   const [pinInput, setPinInput] = useState('');
