@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { ScreenType, LostItemReport, FoundItemAsset, NotificationItem } from './types';
+import { ScreenType, LostItemReport, FoundItemAsset, NotificationItem, DashboardMatch } from './types';
 import { RECOVERY_CENTERS, NOTIFICATIONS, CURRENT_USER } from './data/mockData';
-import { adaptFoundItem } from './lib/adaptItems';
+import { adaptFoundItem, adaptLostReport } from './lib/adaptItems';
+import { supabase } from './lib/supabaseClient';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { ReportScreen } from './components/ReportScreen';
@@ -68,6 +69,30 @@ export default function App() {
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifyTargetItem, setVerifyTargetItem] = useState<FoundItemAsset | null>(null);
   const [isMatrixModalOpen, setIsMatrixModalOpen] = useState(false);
+
+  // The specific match pair currently open in the "Compare Fields" modal —
+  // fetched fresh by ID when a match card is clicked, so the modal always
+  // shows the real pair instead of a stale/placeholder one.
+  const [inspectedLostReport, setInspectedLostReport] = useState<LostItemReport | null>(null);
+  const [inspectedFoundItem, setInspectedFoundItem] = useState<FoundItemAsset | null>(null);
+  const [inspectedScore, setInspectedScore] = useState(0);
+
+  const handleInspectMatch = async (match: DashboardMatch) => {
+    try {
+      const [reportRes, itemRes] = await Promise.all([
+        fetch(`${API_BASE}/lost-reports/${match.lost_report_id}`),
+        fetch(`${API_BASE}/found-items/${match.found_item_id}`),
+      ]);
+      const [reportData, itemData] = await Promise.all([reportRes.json(), itemRes.json()]);
+      setInspectedLostReport(adaptLostReport(reportData));
+      setInspectedFoundItem(adaptFoundItem(itemData));
+      setInspectedScore(Math.round(match.match_score * 100));
+      setIsMatrixModalOpen(true);
+    } catch {
+      showToast('Could not load that match right now.');
+    }
+  };
+
   const [isFoundModalOpen, setIsFoundModalOpen] = useState(false);
   const [isQuickTrackOpen, setIsQuickTrackOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -89,12 +114,48 @@ export default function App() {
   returned_items: 0,
 });
 
-useEffect(() => {
-  fetch(`${API_BASE}/dashboard/stats`)
-    .then((res) => res.json())
-    .then(setDashboardStats)
-    .catch(() => {});
-}, [lostReports]);
+  // Real, live "Possible Matches" feed — replaces the old hardcoded single
+  // lost/found pair. Fetched from find_all_open_matches() via the backend,
+  // and refreshed automatically whenever the underlying tables change.
+  const [dashboardMatches, setDashboardMatches] = useState<DashboardMatch[]>([]);
+
+  const refreshDashboardData = () => {
+    fetch(`${API_BASE}/dashboard/stats`)
+      .then((res) => res.json())
+      .then(setDashboardStats)
+      .catch(() => {});
+
+    fetch(`${API_BASE}/dashboard/matches`)
+      .then((res) => res.json())
+      .then((data) => setDashboardMatches(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    refreshDashboardData();
+  }, [lostReports]);
+
+  // Real-time updates: subscribe to changes on both tables so the dashboard
+  // refreshes for everyone the moment a new report/found item is added or a
+  // match's status changes elsewhere — no manual refresh needed. Falls back
+  // to periodic polling if Supabase realtime isn't configured (see
+  // src/lib/supabaseClient.ts) so the dashboard still stays reasonably fresh.
+  useEffect(() => {
+    if (!supabase) {
+      const interval = setInterval(refreshDashboardData, 15000);
+      return () => clearInterval(interval);
+    }
+
+    const channel = supabase
+      .channel('lost-found-matches')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lost_reports' }, refreshDashboardData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'found_items' }, refreshDashboardData)
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
+  }, []);
 
   // Keyboard shortcut for Quick Track
   useEffect(() => {
@@ -287,12 +348,12 @@ useEffect(() => {
               setVerifyTargetItem(item);
               setIsVerifyModalOpen(true);
             }}
-            onInspectMatrix={() => setIsMatrixModalOpen(true)}
+            onInspectMatrix={handleInspectMatch}
             lostReport={lostReports[0] ?? EMPTY_LOST_REPORT}
             foundItem={foundItem ?? EMPTY_FOUND_ITEM}
             secondaryItem={secondaryItem ?? EMPTY_FOUND_ITEM}
             recoveryCenters={RECOVERY_CENTERS}
-            
+            matches={dashboardMatches}
             stats={dashboardStats}
           />
         )}
@@ -331,14 +392,14 @@ useEffect(() => {
         isOpen={isMatrixModalOpen}
         onClose={() => setIsMatrixModalOpen(false)}
         onProceedToVerify={() => {
-          if (foundItem) {
-            setVerifyTargetItem(foundItem);
+          if (inspectedFoundItem) {
+            setVerifyTargetItem(inspectedFoundItem);
             setIsVerifyModalOpen(true);
           }
         }}
-        lostReport={lostReports[0] ?? null}
-        foundItem={foundItem}
-        matchScore={lostReports[0]?.matchConfidence ?? 0}
+        lostReport={inspectedLostReport}
+        foundItem={inspectedFoundItem}
+        matchScore={inspectedScore}
       />
 
       <FoundReportModal

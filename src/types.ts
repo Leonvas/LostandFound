@@ -47,6 +47,23 @@ export interface FoundItemAsset {
   };
 }
 
+// One row from the backend's /dashboard/matches endpoint (find_all_open_matches()).
+// Real data — not the fabricated single lost/found pair the dashboard used to assume.
+export interface DashboardMatch {
+  lost_report_id: string;
+  lost_name: string;
+  lost_category: string | null;
+  lost_building: string | null;
+  lost_reported_at: string | null;
+  found_item_id: string;
+  found_name: string;
+  found_category: string | null;
+  found_building: string | null;
+  found_photo_url: string | null;
+  found_at: string | null;
+  match_score: number; // 0-1, from pg_trgm-weighted similarity
+}
+
 export interface AttributeMatchVector {
   attribute: string;
   lostValue: string;
