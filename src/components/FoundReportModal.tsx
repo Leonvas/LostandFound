@@ -11,6 +11,7 @@ interface FoundReportModalProps {
 export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Electronics');
+  const [customCategory, setCustomCategory] = useState('');
   const [color, setColor] = useState('');
   const [material, setMaterial] = useState('');
   const [location, setLocation] = useState('Bobst Library');
@@ -59,6 +60,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const building = location === 'Other' ? customBuilding.trim() : location;
+    const finalCategory = category === 'Other' ? customCategory.trim() : category;
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
@@ -66,7 +68,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
       onSuccess({
         id: `FND-NYU-${Math.floor(7500 + Math.random() * 500)}`,
         name: title || 'Found Item',
-        category,
+        category: finalCategory,
         color: color.trim() || undefined,
         material: material.trim() || undefined,
         building,
@@ -125,6 +127,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
                   <option value="Bottles & Mugs">Bottles & Mugs</option>
                   <option value="Clothing">Clothing</option>
                   <option value="Books & Notebooks">Books & Notebooks</option>
+                  <option value="Other">Other (type your own)</option>
                 </select>
               </div>
 
@@ -144,6 +147,20 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
                 </select>
               </div>
             </div>
+
+            {category === 'Other' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Category Name</label>
+                <input
+                  type="text"
+                  required
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="e.g. Musical Instrument, Sports Gear"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+            )}
 
             {location === 'Other' && (
               <div>

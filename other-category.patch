@@ -1,0 +1,105 @@
+diff --git a/src/components/FoundReportModal.tsx b/src/components/FoundReportModal.tsx
+index fb90467..ad7c02a 100644
+--- a/src/components/FoundReportModal.tsx
++++ b/src/components/FoundReportModal.tsx
+@@ -11,6 +11,7 @@ interface FoundReportModalProps {
+ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModalProps) {
+   const [title, setTitle] = useState('');
+   const [category, setCategory] = useState('Electronics');
++  const [customCategory, setCustomCategory] = useState('');
+   const [color, setColor] = useState('');
+   const [material, setMaterial] = useState('');
+   const [location, setLocation] = useState('Bobst Library');
+@@ -59,6 +60,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+   const handleSubmit = (e: FormEvent) => {
+     e.preventDefault();
+     const building = location === 'Other' ? customBuilding.trim() : location;
++    const finalCategory = category === 'Other' ? customCategory.trim() : category;
+     setIsSubmitting(true);
+     setTimeout(() => {
+       setIsSubmitting(false);
+@@ -66,7 +68,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+       onSuccess({
+         id: `FND-NYU-${Math.floor(7500 + Math.random() * 500)}`,
+         name: title || 'Found Item',
+-        category,
++        category: finalCategory,
+         color: color.trim() || undefined,
+         material: material.trim() || undefined,
+         building,
+@@ -125,6 +127,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+                   <option value="Bottles & Mugs">Bottles & Mugs</option>
+                   <option value="Clothing">Clothing</option>
+                   <option value="Books & Notebooks">Books & Notebooks</option>
++                  <option value="Other">Other (type your own)</option>
+                 </select>
+               </div>
+ 
+@@ -145,6 +148,20 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+               </div>
+             </div>
+ 
++            {category === 'Other' && (
++              <div>
++                <label className="block text-xs font-bold text-slate-800 mb-1">Category Name</label>
++                <input
++                  type="text"
++                  required
++                  value={customCategory}
++                  onChange={(e) => setCustomCategory(e.target.value)}
++                  placeholder="e.g. Musical Instrument, Sports Gear"
++                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
++                />
++              </div>
++            )}
++
+             {location === 'Other' && (
+               <div>
+                 <label className="block text-xs font-bold text-slate-800 mb-1">Building Name</label>
+diff --git a/src/components/ReportScreen.tsx b/src/components/ReportScreen.tsx
+index 292f269..6a91425 100644
+--- a/src/components/ReportScreen.tsx
++++ b/src/components/ReportScreen.tsx
+@@ -31,6 +31,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+   // Form State
+   const [name, setName] = useState('Black Leather Bifold Wallet');
+   const [category, setCategory] = useState('Wallets, Bags & Accessories');
++  const [customCategory, setCustomCategory] = useState('');
+   const [color, setColor] = useState('Black / Dark Charcoal');
+   const [brand, setBrand] = useState('Bellroy Slim Sleeve');
+   const [material, setMaterial] = useState('Genuine Full-Grain Leather');
+@@ -110,11 +111,12 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+   const handleSubmit = (e: FormEvent) => {
+     e.preventDefault();
+     setIsSubmitting(true);
++    const finalCategory = category === 'Other' ? customCategory.trim() : category;
+ 
+     setTimeout(() => {
+       onSubmitReport({
+         name,
+-        category,
++        category: finalCategory,
+         color,
+         brand,
+         material,
+@@ -240,8 +242,20 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+               <option value="Student Credentials & Cards">Student Credentials & Cards</option>
+               <option value="Drinkware & Bottles">Drinkware & Bottles</option>
+               <option value="Apparel & Accessories">Apparel & Accessories</option>
++              <option value="Other">Other (type your own)</option>
+             </select>
+ 
++            {category === 'Other' && (
++              <input
++                type="text"
++                required
++                value={customCategory}
++                onChange={(e) => setCustomCategory(e.target.value)}
++                placeholder="e.g. Musical Instrument, Sports Gear"
++                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-medium mb-3"
++              />
++            )}
++
+             {/* Category Presets Pills */}
+             <div className="flex flex-wrap gap-2 pt-1">
+               {categoryPresets.map((preset) => {

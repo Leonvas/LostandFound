@@ -31,6 +31,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
   // Form State
   const [name, setName] = useState('Black Leather Bifold Wallet');
   const [category, setCategory] = useState('Wallets, Bags & Accessories');
+  const [customCategory, setCustomCategory] = useState('');
   const [color, setColor] = useState('Black / Dark Charcoal');
   const [brand, setBrand] = useState('Bellroy Slim Sleeve');
   const [material, setMaterial] = useState('Genuine Full-Grain Leather');
@@ -110,11 +111,12 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    const finalCategory = category === 'Other' ? customCategory.trim() : category;
 
     setTimeout(() => {
       onSubmitReport({
         name,
-        category,
+        category: finalCategory,
         color,
         brand,
         material,
@@ -240,7 +242,19 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
               <option value="Student Credentials & Cards">Student Credentials & Cards</option>
               <option value="Drinkware & Bottles">Drinkware & Bottles</option>
               <option value="Apparel & Accessories">Apparel & Accessories</option>
+              <option value="Other">Other (type your own)</option>
             </select>
+
+            {category === 'Other' && (
+              <input
+                type="text"
+                required
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder="e.g. Musical Instrument, Sports Gear"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-medium mb-3"
+              />
+            )}
 
             {/* Category Presets Pills */}
             <div className="flex flex-wrap gap-2 pt-1">
