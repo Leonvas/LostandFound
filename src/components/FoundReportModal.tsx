@@ -11,7 +11,10 @@ interface FoundReportModalProps {
 export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModalProps) {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Electronics');
+  const [color, setColor] = useState('');
+  const [material, setMaterial] = useState('');
   const [location, setLocation] = useState('Bobst Library');
+  const [customBuilding, setCustomBuilding] = useState('');
   const [room, setRoom] = useState('4th Floor Study Room');
   const [handoverPref, setHandoverPref] = useState('front_desk');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +58,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    const building = location === 'Other' ? customBuilding.trim() : location;
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
@@ -63,7 +67,10 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
         id: `FND-NYU-${Math.floor(7500 + Math.random() * 500)}`,
         name: title || 'Found Item',
         category,
-        location: `${location} - ${room}`,
+        color: color.trim() || undefined,
+        material: material.trim() || undefined,
+        building,
+        location: `${building} - ${room}`,
         custodian: handoverPref,
         photoUrl: photoUrl || undefined,
       });
@@ -133,7 +140,46 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
                   <option value="Silver Center">Silver Center</option>
                   <option value="Courant Institute">Courant Institute</option>
                   <option value="Campus Safety HQ">Campus Safety HQ</option>
+                  <option value="Other">Other (type your own)</option>
                 </select>
+              </div>
+            </div>
+
+            {location === 'Other' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Building Name</label>
+                <input
+                  type="text"
+                  required
+                  value={customBuilding}
+                  onChange={(e) => setCustomBuilding(e.target.value)}
+                  placeholder="e.g. Stern School of Business"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Colour</label>
+                <input
+                  type="text"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  placeholder="e.g. Black, Navy Blue"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">Material</label>
+                <input
+                  type="text"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  placeholder="e.g. Leather, Aluminium"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                />
               </div>
             </div>
 

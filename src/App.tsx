@@ -195,7 +195,10 @@ useEffect(() => {
      body: JSON.stringify({
       name: item.name,
       category: item.category,
+      color: item.color || null,
+      material: item.material || null,
       found_location: item.location,
+      building: item.building || null,
       custodian: item.custodian,
       photo_url: item.photoUrl || null,
     }),
