@@ -5,7 +5,16 @@ from dotenv import load_dotenv
 from supabase import create_client
 import os
 
-load_dotenv()
+# Load .env regardless of whether it lives next to this file (backend/.env)
+# or at the project root (LostandFound/.env) — whichever exists is used.
+_here = os.path.dirname(__file__)
+_project_root = os.path.dirname(_here)
+for _candidate in (os.path.join(_here, ".env"), os.path.join(_project_root, ".env")):
+    if os.path.exists(_candidate):
+        load_dotenv(_candidate)
+        break
+else:
+    load_dotenv()  # last resort: default lookup from current working directory
 
 app = FastAPI(title="Campus Lost & Found API")
 
@@ -74,6 +83,18 @@ def get_dashboard_stats():
         "returned_items": returned.count or 0,
     }
 
+@app.get("/dashboard/matches")
+def get_dashboard_matches():
+    """
+    Every current possible match across ALL open lost reports x in-custody
+    found items, ranked by score. Backs the dashboard's "Possible Matches"
+    panel — this is real data from find_all_open_matches(), not a single
+    hardcoded pair.
+    """
+    matches = supabase.rpc("find_all_open_matches", {}).execute()
+    return matches.data
+
+
 @app.get("/")
 def home():
     return {"message": "Campus Lost & Found Backend is running!"}
@@ -121,10 +142,34 @@ def create_lost_report(report: LostReportIn):
     return {"report": new_report, "matches": matches.data}
 
 
+@app.get("/lost-reports/{report_id}")
+def get_lost_report(report_id: str):
+    response = (
+        supabase.table("lost_reports")
+        .select("*")
+        .eq("id", report_id)
+        .single()
+        .execute()
+    )
+    return response.data
+
+
 @app.get("/lost-reports/{report_id}/matches")
 def get_matches_for_lost_report(report_id: str):
     matches = supabase.rpc("find_matches_for_lost", {"report_id": report_id}).execute()
     return matches.data
+
+
+@app.get("/found-items/{item_id}")
+def get_found_item(item_id: str):
+    response = (
+        supabase.table("found_items")
+        .select("*")
+        .eq("id", item_id)
+        .single()
+        .execute()
+    )
+    return response.data
 
 
 @app.get("/found-items/{item_id}/matches")

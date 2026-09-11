@@ -1,4 +1,4 @@
-import { FoundItemAsset } from '../types';
+import { FoundItemAsset, LostItemReport } from '../types';
 
 export function adaptFoundItem(row: any): FoundItemAsset {
   return {
@@ -18,5 +18,29 @@ export function adaptFoundItem(row: any): FoundItemAsset {
     building: row.building ?? '',
     matchedReportId: row.matched_report_id ?? undefined,
     matchScore: row.match_score ?? undefined,
+  };
+}
+
+export function adaptLostReport(row: any): LostItemReport {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category ?? '',
+    color: row.color ?? '',
+    brand: row.brand ?? '',
+    material: row.material ?? '',
+    dateLost: row.date_lost ?? '',
+    timeRange: row.time_range ?? '',
+    building: row.building ?? '',
+    subLocation: row.sub_location ?? '',
+    geoPin: { lat: 0, lng: 0 },
+    internalIdentifiers: row.internal_identifiers ?? '',
+    wearMarks: row.wear_marks ?? '',
+    hasPhoto: row.has_photo ?? false,
+    photoUrl: row.photo_url ?? undefined,
+    reportedAt: row.reported_at ? new Date(row.reported_at).toLocaleString() : '',
+    status: row.status ?? 'scanning',
+    matchConfidence: row.match_confidence ?? undefined,
+    matchedItemId: row.matched_item_id ?? undefined,
   };
 }

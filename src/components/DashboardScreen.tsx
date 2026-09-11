@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScreenType, LostItemReport, FoundItemAsset, RecoveryCenter } from '../types';
+import { ScreenType, LostItemReport, FoundItemAsset, RecoveryCenter, DashboardMatch } from '../types';
 import { CURRENT_USER } from '../data/mockData';
 import {
   ShieldCheck,
@@ -8,7 +8,6 @@ import {
   Sparkles,
   MapPin,
   Clock,
-  Lock,
   ArrowRight,
   CheckCircle2,
   FileText,
@@ -30,12 +29,13 @@ interface DashboardScreenProps {
   onOpenReportModal: () => void;
   onOpenFoundModal: () => void;
   onOpenVerifyModal: (foundItem: FoundItemAsset) => void;
-  onInspectMatrix: () => void;
+  onInspectMatrix: (match: DashboardMatch) => void;
   lostReport: LostItemReport;
   foundItem: FoundItemAsset;
   secondaryItem: FoundItemAsset;
   recoveryCenters: RecoveryCenter[];
   stats: { active_reports: number; possible_matches: number; returned_items: number };
+  matches: DashboardMatch[];
 }
 
 export function DashboardScreen({
@@ -49,11 +49,17 @@ export function DashboardScreen({
   secondaryItem,
   recoveryCenters,
   stats,
+  matches,
 }: DashboardScreenProps) {
   const [activeBeacon, setActiveBeacon] = useState('bobst');
 
   const hour = new Date().getHours();
 const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Real, sorted matches from find_all_open_matches() — highest score first.
+  const sortedMatches = [...matches].sort((a, b) => b.match_score - a.match_score);
+  const topMatch = sortedMatches[0];
+  const topMatchPct = topMatch ? Math.round(topMatch.match_score * 100) : 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 pb-20">
@@ -64,9 +70,17 @@ const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' :
            {timeGreeting}, {CURRENT_USER.name} 👋
           </h1>
           <p className="text-sm text-slate-600 mt-1">
-            Let's get your belongings back. You have{' '}
-            <strong className="text-emerald-700 font-bold">1 high-confidence match</strong> pending
-            your verification.
+            {sortedMatches.length > 0 ? (
+              <>
+                Let's get your belongings back. You have{' '}
+                <strong className="text-emerald-700 font-bold">
+                  {sortedMatches.length} possible {sortedMatches.length === 1 ? 'match' : 'matches'}
+                </strong>{' '}
+                {topMatch && `(top score ${topMatchPct}%) `}pending review.
+              </>
+            ) : (
+              "No possible matches yet — we'll surface one here as soon as a found item's description lines up with an open report."
+            )}
           </p>
         </div>
 
@@ -150,7 +164,7 @@ const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' :
             {stats.possible_matches}
           </div>
           <div className="text-[11px] text-emerald-700 font-medium mt-1">
-            1 high confidence (89%)
+            {topMatch ? `Top score: ${topMatchPct}%` : 'No matches yet'}
           </div>
         </div>
 
@@ -180,161 +194,128 @@ const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' :
               </span>
             </div>
             <button
-              onClick={onInspectMatrix}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              onClick={() => topMatch && onInspectMatrix(topMatch)}
+              disabled={!topMatch}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span>Filter criteria</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          {/* MATCH CARD 1: 89% High Confidence Match (Matching Image 8!) */}
-          <div className="bg-white border-2 border-emerald-500/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-5 relative">
-            {/* Header row */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                  <CreditCard className="w-5 h-5 text-blue-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-900 text-base">{lostReport.name}</h3>
-                    <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                      REPORT #NYU-8821
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Reported lost {lostReport.reportedAt} • Central Library East Wing Study Table 4B
-                  </p>
-                </div>
-              </div>
-
-              {/* Match Score Badge */}
-              <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold px-3 py-1 rounded-full shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>89% Match</span>
-              </div>
+          {/* REAL POSSIBLE MATCHES — from find_all_open_matches(), refreshed live via
+              Supabase realtime / polling in App.tsx. No hardcoded scores or narrative. */}
+          {sortedMatches.length === 0 && (
+            <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center space-y-2">
+              <Sparkles className="w-6 h-6 text-slate-300 mx-auto" />
+              <h3 className="font-bold text-slate-700 text-sm">No possible matches right now</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                As soon as a found item's description overlaps with an open lost report, it'll
+                show up here automatically — no refresh needed.
+              </p>
             </div>
+          )}
 
-            {/* Found Item Alert & Safe Hold Banner */}
-            <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-emerald-950 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  Found 45 mins ago at <strong className="font-semibold">2nd Floor Study Commons</strong>{' '}
-                  by Campus Safety Desk
-                </span>
-              </div>
-              <span className="font-mono text-[11px] bg-emerald-100/80 text-emerald-800 font-semibold px-2 py-0.5 rounded">
-                Custodian Safe Hold #2
-              </span>
-            </div>
+          {sortedMatches.map((m, idx) => {
+            const pct = Math.round(m.match_score * 100);
+            const isTop = idx === 0;
+            const isHighConfidence = m.match_score >= 0.3;
 
-            {/* Attributes Pills */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-medium">Category</span>
-                <span className="font-semibold text-slate-800">{foundItem.category}</span>
-              </div>
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-medium">Color & Tone</span>
-                <span className="font-semibold text-slate-800">{foundItem.color}</span>
-              </div>
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-medium">Material</span>
-                <span className="font-semibold text-slate-800">{foundItem.material}</span>
-              </div>
-              <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <span className="text-[10px] text-slate-400 block font-medium">Identifiers</span>
-                <span className="font-semibold text-blue-700">{foundItem.identifiersPreview}</span>
-              </div>
-            </div>
+            return (
+              <div
+                key={`${m.lost_report_id}-${m.found_item_id}`}
+                className={
+                  isTop && isHighConfidence
+                    ? 'bg-white border-2 border-emerald-500/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 relative'
+                    : 'bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'
+                }
+              >
+                {isTop && isHighConfidence ? (
+                  <>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                          <CreditCard className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-base">{m.lost_name}</h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {m.lost_building ? `Lost near ${m.lost_building}` : 'Location not specified'}
+                            {' • '}
+                            Possible match: <span className="font-semibold text-slate-700">{m.found_name}</span>
+                            {m.found_building ? ` (found at ${m.found_building})` : ''}
+                          </p>
+                        </div>
+                      </div>
 
-            {/* Image comparison & Photo-Optional Reassurance Callout Box */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="relative w-24 h-20 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0">
-                <img
-                  src={foundItem.photoUrl}
-                  alt="Found Item"
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/20 flex items-end p-1">
-                  <span className="text-[8px] text-white font-mono bg-black/60 px-1 rounded">
-                    #FND-7422
-                  </span>
-                </div>
-              </div>
+                      <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold px-3 py-1 rounded-full shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>{pct}% Match</span>
+                      </div>
+                    </div>
 
-              <div className="space-y-1.5 text-xs">
-                <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Photo-Optional System Reassurance</span>
-                </div>
-                <p className="text-slate-600 text-[11px] leading-relaxed">
-                  You didn't submit an image with your report. Our AI engine successfully correlated
-                  your description (<em className="text-slate-800">"black bifold with gym tag"</em>)
-                  with metadata ingested by Safety Officer Perez.
-                </p>
-                <div className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                  <Lock className="w-3 h-3 text-emerald-600" />
-                  <span>Blind claim active: PII protected until ownership verified</span>
-                </div>
-              </div>
-            </div>
+                    {m.found_photo_url && (
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex items-center gap-4">
+                        <div className="relative w-24 h-20 rounded-lg overflow-hidden bg-white border border-slate-200 shrink-0">
+                          <img src={m.found_photo_url} alt={m.found_name} className="w-full h-full object-cover" />
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          Matched on description similarity (name, category, color, material, and
+                          location) — not on this photo yet. Open the match to compare fields
+                          side-by-side before verifying.
+                        </p>
+                      </div>
+                    )}
 
-            {/* Card Footer: Expiration & Actions */}
-            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="text-slate-500 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Hold reservation expires in 46 hours</span>
-              </div>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => onInspectMatrix(m)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"
+                      >
+                        Compare Fields
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onInspectMatrix(m)}
+                        className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      >
+                        <span>View Match & Verify</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                        <Laptop className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-slate-900 text-sm">{m.lost_name}</h4>
+                          <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                            {pct}% Match Candidate
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Possible match: {m.found_name}
+                          {m.found_building ? ` • Found at ${m.found_building}` : ''}
+                        </p>
+                      </div>
+                    </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  type="button"
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer"
-                >
-                  Not Mine
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onOpenVerifyModal(foundItem)}
-                  className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold px-4 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                >
-                  <span>View Match & Verify</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                    <button
+                      onClick={() => onInspectMatrix(m)}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-50 shrink-0 cursor-pointer"
+                    >
+                      Compare Fields
+                    </button>
+                  </>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* MATCH CARD 2: 52% Candidate (MacBook Air) */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
-                <Laptop className="w-4 h-4" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold text-slate-900 text-sm">{secondaryItem.name}</h4>
-                  <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded">
-                    52% Match Candidate
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Reported Lost Yesterday • Status: Searching Campus Repositories (Flagged in Bobst
-                  Basement Tech Lab)
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={onInspectMatrix}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-50 shrink-0 cursor-pointer"
-            >
-              Inspect Serial Registry
-            </button>
-          </div>
+            );
+          })}
 
           {/* CAMPUS RECOVERY PERIMETER MAP / TELEMETRY CARD */}
           <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
