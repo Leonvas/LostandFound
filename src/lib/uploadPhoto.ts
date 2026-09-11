@@ -12,6 +12,10 @@ export type PhotoFolder = 'lost' | 'found';
  * callers should catch this and show the user a toast/error.
  */
 export async function uploadItemPhoto(file: File, folder: PhotoFolder): Promise<string> {
+  if (!supabase) {
+    throw new Error('Supabase is not configured for photo uploads.');
+  }
+
   const fileExt = file.name.split('.').pop() || 'jpg';
   const randomId =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
