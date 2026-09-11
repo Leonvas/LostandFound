@@ -1,0 +1,393 @@
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..fb4c1f1
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,7 @@
++# Frontend (Vite) env vars — used for direct browser uploads to Supabase Storage.
++# These are the PUBLIC anon key, safe to ship in the browser bundle as long as
++# Storage policies on the "item-photos" bucket are set correctly.
++# Copy this file to .env and fill in your project's values (Supabase
++# dashboard -> Project Settings -> API).
++VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
++VITE_SUPABASE_ANON_KEY=your-anon-public-key
+diff --git a/src/App.tsx b/src/App.tsx
+index c7398fe..a882b89 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -127,6 +127,7 @@ useEffect(() => {
+       internal_identifiers: reportData.internalIdentifiers,
+       wear_marks: reportData.wearMarks,
+       has_photo: reportData.hasPhoto || false,
++      photo_url: reportData.photoUrl || null,
+     }),
+     });
+ 
+@@ -195,6 +196,8 @@ useEffect(() => {
+       name: item.name,
+       category: item.category,
+       found_location: item.location,
++      custodian: item.custodian,
++      photo_url: item.photoUrl || null,
+     }),
+     });
+ 
+diff --git a/src/components/FoundReportModal.tsx b/src/components/FoundReportModal.tsx
+index 7dc3c9b..540d45a 100644
+--- a/src/components/FoundReportModal.tsx
++++ b/src/components/FoundReportModal.tsx
+@@ -1,5 +1,6 @@
+-import { useState, FormEvent } from 'react';
+-import { HandHeart, X, Camera, MapPin, Building, Award, CheckCircle2, ArrowRight } from 'lucide-react';
++import { useState, useRef, FormEvent, ChangeEvent } from 'react';
++import { HandHeart, X, Camera, MapPin, Building, Award, CheckCircle2, ArrowRight, Upload, Loader2 } from 'lucide-react';
++import { uploadItemPhoto } from '../lib/uploadPhoto';
+ 
+ interface FoundReportModalProps {
+   isOpen: boolean;
+@@ -16,8 +17,42 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [submitted, setSubmitted] = useState(false);
+ 
++  // Photo upload state
++  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
++  const [photoFileName, setPhotoFileName] = useState<string | null>(null);
++  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
++  const [photoError, setPhotoError] = useState<string | null>(null);
++  const fileInputRef = useRef<HTMLInputElement>(null);
++
+   if (!isOpen) return null;
+ 
++  const handlePhotoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
++    const file = e.target.files?.[0];
++    e.target.value = '';
++    if (!file) return;
++
++    setPhotoError(null);
++    setPhotoFileName(file.name);
++    setIsUploadingPhoto(true);
++
++    try {
++      const url = await uploadItemPhoto(file, 'found');
++      setPhotoUrl(url);
++    } catch (err) {
++      console.error('Photo upload failed:', err);
++      setPhotoError('Could not upload that photo. Please try again.');
++      setPhotoFileName(null);
++    } finally {
++      setIsUploadingPhoto(false);
++    }
++  };
++
++  const handleRemovePhoto = () => {
++    setPhotoUrl(null);
++    setPhotoFileName(null);
++    setPhotoError(null);
++  };
++
+   const handleSubmit = (e: FormEvent) => {
+     e.preventDefault();
+     setIsSubmitting(true);
+@@ -30,6 +65,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+         category,
+         location: `${location} - ${room}`,
+         custodian: handoverPref,
++        photoUrl: photoUrl || undefined,
+       });
+     }, 700);
+   };
+@@ -145,6 +181,65 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+               </div>
+             </div>
+ 
++            <div>
++              <label className="block text-xs font-bold text-slate-800 mb-1">
++                Add a Photo (optional)
++              </label>
++
++              <input
++                ref={fileInputRef}
++                type="file"
++                accept="image/png,image/jpeg,image/jpg,image/heic,image/heif"
++                className="hidden"
++                onChange={handlePhotoFileChange}
++              />
++
++              {photoUrl ? (
++                <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50 flex items-center gap-3">
++                  <img
++                    src={photoUrl}
++                    alt="Found item preview"
++                    className="w-10 h-10 rounded-md object-cover border border-slate-200 shrink-0"
++                  />
++                  <div className="flex-1 min-w-0">
++                    <div className="text-xs font-semibold text-slate-700 truncate">
++                      {photoFileName || 'Photo uploaded'}
++                    </div>
++                    <div className="text-[10px] text-emerald-600 font-medium">Uploaded successfully</div>
++                  </div>
++                  <button
++                    type="button"
++                    onClick={handleRemovePhoto}
++                    className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 shrink-0"
++                  >
++                    <X className="w-4 h-4" />
++                  </button>
++                </div>
++              ) : (
++                <button
++                  type="button"
++                  onClick={() => fileInputRef.current?.click()}
++                  disabled={isUploadingPhoto}
++                  className="w-full border border-dashed border-slate-300 rounded-lg p-3 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center gap-1 cursor-pointer disabled:opacity-60"
++                >
++                  {isUploadingPhoto ? (
++                    <>
++                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
++                      <span className="text-xs font-semibold text-slate-700">Uploading photo…</span>
++                    </>
++                  ) : (
++                    <>
++                      <Upload className="w-5 h-5 text-slate-400" />
++                      <span className="text-xs font-semibold text-slate-700">Click to select a photo</span>
++                      <span className="text-[10px] text-slate-400">PNG, JPG or HEIC up to 15MB</span>
++                    </>
++                  )}
++                </button>
++              )}
++
++              {photoError && <div className="text-[11px] text-red-600 font-medium mt-1.5">{photoError}</div>}
++            </div>
++
+             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+               <button
+                 type="button"
+@@ -156,7 +251,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
+ 
+               <button
+                 type="submit"
+-                disabled={isSubmitting}
++                disabled={isSubmitting || isUploadingPhoto}
+                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+               >
+                 {isSubmitting ? (
+diff --git a/src/components/ReportScreen.tsx b/src/components/ReportScreen.tsx
+index 7cd097c..292f269 100644
+--- a/src/components/ReportScreen.tsx
++++ b/src/components/ReportScreen.tsx
+@@ -1,5 +1,6 @@
+-import { useState, FormEvent } from 'react';
++import { useState, useRef, FormEvent, ChangeEvent } from 'react';
+ import { ScreenType, LostItemReport } from '../types';
++import { uploadItemPhoto } from '../lib/uploadPhoto';
+ import {
+   ShieldCheck,
+   Zap,
+@@ -17,6 +18,8 @@ import {
+   ArrowLeft,
+   Save,
+   HelpCircle,
++  Loader2,
++  X,
+ } from 'lucide-react';
+ 
+ interface ReportScreenProps {
+@@ -45,6 +48,10 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+   );
+   const [hasPhoto, setHasPhoto] = useState(false);
+   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
++  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
++  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
++  const [photoError, setPhotoError] = useState<string | null>(null);
++  const fileInputRef = useRef<HTMLInputElement>(null);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [activeStep, setActiveStep] = useState(2); // In image, step 1 & 2 are in view
+ 
+@@ -67,6 +74,39 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+ 
+   const confidenceScore = calculateConfidence();
+ 
++  const handlePhotoButtonClick = () => {
++    setHasPhoto(true);
++    fileInputRef.current?.click();
++  };
++
++  const handlePhotoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
++    const file = e.target.files?.[0];
++    e.target.value = ''; // allow re-selecting the same file later
++    if (!file) return;
++
++    setPhotoError(null);
++    setSelectedFileName(file.name);
++    setIsUploadingPhoto(true);
++
++    try {
++      const url = await uploadItemPhoto(file, 'lost');
++      setUploadedPhotoUrl(url);
++      setHasPhoto(true);
++    } catch (err) {
++      console.error('Photo upload failed:', err);
++      setPhotoError('Could not upload that photo. Please try again.');
++      setSelectedFileName(null);
++    } finally {
++      setIsUploadingPhoto(false);
++    }
++  };
++
++  const handleRemovePhoto = () => {
++    setUploadedPhotoUrl(null);
++    setSelectedFileName(null);
++    setPhotoError(null);
++  };
++
+   const handleSubmit = (e: FormEvent) => {
+     e.preventDefault();
+     setIsSubmitting(true);
+@@ -505,7 +545,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {/* Option A: Upload Photo */}
+             <div
+-              onClick={() => setHasPhoto(true)}
++              onClick={handlePhotoButtonClick}
+               className={`p-5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                 hasPhoto
+                   ? 'border-blue-600 bg-blue-50/40 shadow-xs'
+@@ -523,11 +563,59 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+                   Drag and drop a reference image or receipt from your device.
+                 </p>
+ 
+-                <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors">
+-                  <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+-                  <div className="text-xs font-semibold text-slate-700">PNG, JPG or HEIC up to 15MB</div>
+-                  <div className="text-[10px] text-slate-400 mt-0.5">Click to browse device</div>
+-                </div>
++                <input
++                  ref={fileInputRef}
++                  type="file"
++                  accept="image/png,image/jpeg,image/jpg,image/heic,image/heif"
++                  className="hidden"
++                  onClick={(e) => e.stopPropagation()}
++                  onChange={handlePhotoFileChange}
++                />
++
++                {uploadedPhotoUrl ? (
++                  <div
++                    className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3"
++                    onClick={(e) => e.stopPropagation()}
++                  >
++                    <img
++                      src={uploadedPhotoUrl}
++                      alt="Selected item preview"
++                      className="w-12 h-12 rounded-md object-cover border border-slate-200 shrink-0"
++                    />
++                    <div className="flex-1 min-w-0">
++                      <div className="text-xs font-semibold text-slate-700 truncate">
++                        {selectedFileName || 'Photo uploaded'}
++                      </div>
++                      <div className="text-[10px] text-emerald-600 font-medium">Uploaded successfully</div>
++                    </div>
++                    <button
++                      type="button"
++                      onClick={handleRemovePhoto}
++                      className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 shrink-0"
++                    >
++                      <X className="w-4 h-4" />
++                    </button>
++                  </div>
++                ) : (
++                  <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors">
++                    {isUploadingPhoto ? (
++                      <>
++                        <Loader2 className="w-6 h-6 text-blue-500 mx-auto mb-1.5 animate-spin" />
++                        <div className="text-xs font-semibold text-slate-700">Uploading photo…</div>
++                      </>
++                    ) : (
++                      <>
++                        <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
++                        <div className="text-xs font-semibold text-slate-700">PNG, JPG or HEIC up to 15MB</div>
++                        <div className="text-[10px] text-slate-400 mt-0.5">Click to browse device</div>
++                      </>
++                    )}
++                  </div>
++                )}
++
++                {photoError && (
++                  <div className="text-[11px] text-red-600 font-medium mt-2">{photoError}</div>
++                )}
+               </div>
+ 
+               <div className="text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-100">
+@@ -620,7 +708,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps)
+ 
+             <button
+               type="submit"
+-              disabled={isSubmitting}
++              disabled={isSubmitting || isUploadingPhoto}
+               className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs sm:text-sm px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-sm transition-all hover:shadow-blue-500/25 cursor-pointer disabled:opacity-50"
+             >
+               {isSubmitting ? (
+diff --git a/src/lib/supabaseClient.ts b/src/lib/supabaseClient.ts
+new file mode 100644
+index 0000000..a8c7c89
+--- /dev/null
++++ b/src/lib/supabaseClient.ts
+@@ -0,0 +1,19 @@
++import { createClient } from '@supabase/supabase-js';
++
++// These are the PUBLIC (anon) Supabase credentials — safe to expose in the
++// browser bundle as long as Row Level Security / Storage policies are set up
++// correctly on the Supabase project. Never put the service_role/secret key
++// here (that one stays in backend/.env and is only used by main.py).
++const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
++const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
++
++if (!supabaseUrl || !supabaseAnonKey) {
++  // Don't throw — just warn, so the rest of the app (which talks to the
++  // FastAPI backend) still works even before photo uploads are configured.
++  console.warn(
++    '[supabaseClient] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set. ' +
++      'Photo uploads will fail until these are added to your .env file.'
++  );
++}
++
++export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '');
+diff --git a/src/lib/uploadPhoto.ts b/src/lib/uploadPhoto.ts
+new file mode 100644
+index 0000000..9833c45
+--- /dev/null
++++ b/src/lib/uploadPhoto.ts
+@@ -0,0 +1,34 @@
++import { supabase } from './supabaseClient';
++
++// Single bucket, split into "lost/" and "found/" folders so photos for both
++// report types are easy to tell apart in the Supabase dashboard.
++const PHOTO_BUCKET = 'item-photos';
++
++export type PhotoFolder = 'lost' | 'found';
++
++/**
++ * Uploads a single image file to Supabase Storage and returns its public URL.
++ * Throws if the upload fails (bucket missing, RLS policy blocking, etc.) —
++ * callers should catch this and show the user a toast/error.
++ */
++export async function uploadItemPhoto(file: File, folder: PhotoFolder): Promise<string> {
++  const fileExt = file.name.split('.').pop() || 'jpg';
++  const randomId =
++    typeof crypto !== 'undefined' && 'randomUUID' in crypto
++      ? crypto.randomUUID()
++      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
++  const path = `${folder}/${randomId}.${fileExt}`;
++
++  const { error: uploadError } = await supabase.storage.from(PHOTO_BUCKET).upload(path, file, {
++    cacheControl: '3600',
++    upsert: false,
++    contentType: file.type || undefined,
++  });
++
++  if (uploadError) {
++    throw uploadError;
++  }
++
++  const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
++  return data.publicUrl;
++}

@@ -127,6 +127,7 @@ useEffect(() => {
       internal_identifiers: reportData.internalIdentifiers,
       wear_marks: reportData.wearMarks,
       has_photo: reportData.hasPhoto || false,
+      photo_url: reportData.photoUrl || null,
     }),
     });
 
@@ -195,6 +196,8 @@ useEffect(() => {
       name: item.name,
       category: item.category,
       found_location: item.location,
+      custodian: item.custodian,
+      photo_url: item.photoUrl || null,
     }),
     });
 
