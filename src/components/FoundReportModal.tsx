@@ -1,6 +1,15 @@
-import { useState, useRef, FormEvent, ChangeEvent } from 'react';
-import { HandHeart, X, Camera, MapPin, Building, Award, CheckCircle2, ArrowRight, Upload, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
+import { HandHeart, X, CheckCircle2, ArrowRight, Upload, Loader2 } from 'lucide-react';
 import { uploadItemPhoto } from '../lib/uploadPhoto';
+
+// Matches the pattern already used in App.tsx / BrowseItemsScreen.tsx / QuickTrackModal.tsx
+const API_BASE = 'http://localhost:8000';
+
+interface VerificationField {
+  field_key: string;
+  label: string;
+  field_type: string;
+}
 
 interface FoundReportModalProps {
   isOpen: boolean;
@@ -21,6 +30,55 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Dynamic, category-driven "private attributes" — these back the verification
+  // questions later shown to a claimant, and are never surfaced in BrowseItemsScreen
+  // or the match matrix.
+  const [verifFields, setVerifFields] = useState<VerificationField[]>([]);
+  const [isLoadingVerifFields, setIsLoadingVerifFields] = useState(false);
+  const [privateAttrs, setPrivateAttrs] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const effectiveCategory = category === 'Other' ? customCategory.trim() : category;
+    if (!effectiveCategory) {
+      setVerifFields([]);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingVerifFields(true);
+
+    fetch(`${API_BASE}/verification-fields?category=${encodeURIComponent(effectiveCategory)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`);
+        return r.json();
+      })
+      .then((data: VerificationField[]) => {
+        if (cancelled) return;
+        setVerifFields(data);
+        // Drop any answers that no longer apply to the new field set, keep the rest
+        setPrivateAttrs((prev) => {
+          const next: Record<string, string> = {};
+          for (const f of data) {
+            if (prev[f.field_key] !== undefined) next[f.field_key] = prev[f.field_key];
+          }
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to load verification fields:', err);
+        if (!cancelled) setVerifFields([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingVerifFields(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Only re-fetch once the user finishes typing a custom category, not on every keystroke —
+    // still fine to depend on it directly here since it's a short string.
+  }, [category, customCategory]);
+
   // Photo upload state
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoFileName, setPhotoFileName] = useState<string | null>(null);
@@ -29,6 +87,10 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handlePrivateAttrChange = (key: string, value: string) => {
+    setPrivateAttrs((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handlePhotoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,6 +137,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
         location: `${building} - ${room}`,
         custodian: handoverPref,
         photoUrl: photoUrl || undefined,
+        private_attributes: privateAttrs,
       });
     }, 700);
   };
@@ -211,6 +274,47 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
               />
             </div>
 
+            {/* PRIVATE VERIFICATION DETAILS — category-driven, kept out of any public listing */}
+            <div className="border-t border-slate-100 pt-4">
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                Private verification details
+              </label>
+              <p className="text-[11px] text-slate-500 mb-2">
+                These are never shown publicly. They'll be used to confirm the real owner later —
+                fill in what you can.
+              </p>
+
+              {isLoadingVerifFields && (
+                <div className="text-xs text-slate-500 flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                  <span>Loading fields for this category…</span>
+                </div>
+              )}
+
+              {!isLoadingVerifFields && verifFields.length === 0 && (
+                <p className="text-[11px] text-slate-400">
+                  No category-specific fields yet — a general description field will be used
+                  instead.
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {verifFields.map((f) => (
+                  <div key={f.field_key}>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      {f.label}
+                    </label>
+                    <input
+                      type="text"
+                      value={privateAttrs[f.field_key] ?? ''}
+                      onChange={(e) => handlePrivateAttrChange(f.field_key, e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-800 mb-1">
                 Handover / Custody Method
@@ -336,7 +440,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h4 className="text-lg font-bold text-slate-900">Thank you for helping campus!</h4>
-  
+
             <button
               onClick={onClose}
               className="w-full bg-slate-900 hover:bg-black text-white text-xs font-semibold py-2.5 rounded-lg"

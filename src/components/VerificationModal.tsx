@@ -1,11 +1,11 @@
-import { useState, FormEvent } from 'react';
-import { FoundItemAsset } from '../types';
+import { useState, useEffect, FormEvent } from 'react';
+import { FoundItemAsset, LostItemReport } from '../types';
+import { CURRENT_USER } from '../data/mockData';
 import {
   ShieldCheck,
   CheckCircle2,
   X,
   Lock,
-  Sparkles,
   KeyRound,
   QrCode,
   MapPin,
@@ -14,9 +14,19 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+// Matches the pattern already used in App.tsx / BrowseItemsScreen.tsx / QuickTrackModal.tsx
+const API_BASE = 'http://localhost:8000';
+
+interface VerificationField {
+  field_key: string;
+  label: string;
+  field_type: string;
+}
+
 interface VerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  lostReport: LostItemReport;
   foundItem: FoundItemAsset;
   onVerificationSuccess: (itemId: string) => void;
 }
@@ -24,36 +34,96 @@ interface VerificationModalProps {
 export function VerificationModal({
   isOpen,
   onClose,
+  lostReport,
   foundItem,
   onVerificationSuccess,
 }: VerificationModalProps) {
-  const [q1, setQ1] = useState('4092');
-  const [q2, setQ2] = useState('A.K.');
-  const [q3, setQ3] = useState('Yes, $20 bill in coin pocket');
+  const [fields, setFields] = useState<VerificationField[]>([]);
+  const [isLoadingFields, setIsLoadingFields] = useState(false);
+  const [fieldsError, setFieldsError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
 
+  // Fetch the category-specific question set whenever the modal opens for a
+  // given found item — this is what makes the questions dynamic instead of
+  // the old hardcoded q1/q2/q3.
+  useEffect(() => {
+    if (!isOpen || !foundItem?.id) return;
+
+    let cancelled = false;
+    setIsLoadingFields(true);
+    setFieldsError(null);
+    setAnswers({});
+    setIsVerified(false);
+    setVerificationError(null);
+
+    fetch(`${API_BASE}/found-items/${foundItem.id}/verification-schema`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed (${r.status})`);
+        return r.json();
+      })
+      .then((data: VerificationField[]) => {
+        if (cancelled) return;
+        setFields(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load verification schema:', err);
+        setFieldsError('Could not load verification questions. Please try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingFields(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, foundItem?.id]);
+
   if (!isOpen) return null;
 
-  const handleVerify = (e: FormEvent) => {
+  const handleAnswerChange = (key: string, value: string) => {
+    setAnswers((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleVerify = async (e: FormEvent) => {
     e.preventDefault();
     setVerificationError(null);
     setIsVerifying(true);
 
-    // Simulate cryptographic zero-knowledge challenge check
-    setTimeout(() => {
-      if (q1.trim().endsWith('4092')) {
+    try {
+      const res = await fetch(`${API_BASE}/verify-claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lost_report_id: lostReport.id,
+          found_item_id: foundItem.id,
+          claimant_user_id: CURRENT_USER.netId,
+          answers,
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      const data = await res.json();
+
+      if (data.passed) {
         setIsVerified(true);
-        setIsVerifying(false);
         onVerificationSuccess(foundItem.id);
       } else {
-        setIsVerifying(false);
         setVerificationError(
-          'Verification hash mismatch. Please review your answers against your registered report.'
+          `That doesn't match closely enough (${Math.round(
+            (data.overall_score ?? 0) * 100
+          )}% confidence). Double-check your answers and try again.`
         );
       }
-    }, 1000);
+    } catch (err) {
+      console.error('Verification request failed:', err);
+      setVerificationError('Something went wrong reaching the verification service. Please try again.');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   return (
@@ -64,7 +134,7 @@ export function VerificationModal({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-blue-400" />
             <div>
-              <h3 className="font-bold text-sm sm:text-base">Zero-Knowledge Blind Verification</h3>
+              <h3 className="font-bold text-sm sm:text-base">Ownership Verification</h3>
               <p className="text-[11px] text-slate-400">Claim Handover for {foundItem.name}</p>
             </div>
           </div>
@@ -82,10 +152,17 @@ export function VerificationModal({
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
               <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
               <p className="leading-relaxed">
-                Campus safety intake officers marked 3 secret descriptors without publishing them.
-                Answering correctly will instantly unlock your electronic handover token.
+                Whoever turned this item in recorded a few private details we never publish.
+                Answer as best you can — you don't need to match their exact wording.
               </p>
             </div>
+
+            {fieldsError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-lg flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{fieldsError}</span>
+              </div>
+            )}
 
             {verificationError && (
               <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3 rounded-lg flex items-center gap-2">
@@ -94,51 +171,34 @@ export function VerificationModal({
               </div>
             )}
 
-            {/* Question 1 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                1. What are the last 4 digits of the student ID or dorm pass stored in the card slot?
-              </label>
-              <input
-                type="text"
-                required
-                value={q1}
-                onChange={(e) => setQ1(e.target.value)}
-                placeholder="e.g. 4092"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              />
-              <span className="text-[10px] text-slate-400">Cryptographically salted & hashed</span>
-            </div>
+            {isLoadingFields && (
+              <div className="text-xs text-slate-500 flex items-center gap-2">
+                <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></div>
+                <span>Loading verification questions…</span>
+              </div>
+            )}
 
-            {/* Question 2 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                2. Are there any engraved initials or monograms on the exterior leather?
-              </label>
-              <input
-                type="text"
-                required
-                value={q2}
-                onChange={(e) => setQ2(e.target.value)}
-                placeholder="e.g. A.K."
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              />
-            </div>
+            {!isLoadingFields &&
+              fields.map((f, idx) => (
+                <div key={f.field_key}>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    {idx + 1}. {f.label}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={answers[f.field_key] ?? ''}
+                    onChange={(e) => handleAnswerChange(f.field_key, e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
+                  />
+                </div>
+              ))}
 
-            {/* Question 3 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1">
-                3. What hidden emergency items or specific currency are concealed inside?
-              </label>
-              <input
-                type="text"
-                required
-                value={q3}
-                onChange={(e) => setQ3(e.target.value)}
-                placeholder="e.g. Emergency $20 bill, transit voucher"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:bg-white"
-              />
-            </div>
+            {!isLoadingFields && !fieldsError && fields.length === 0 && (
+              <p className="text-xs text-slate-500">
+                No verification questions are set up for this item's category yet.
+              </p>
+            )}
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <button
@@ -151,13 +211,13 @@ export function VerificationModal({
 
               <button
                 type="submit"
-                disabled={isVerifying}
+                disabled={isVerifying || isLoadingFields || fields.length === 0}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
               >
                 {isVerifying ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Verifying Cryptographic Tokens...</span>
+                    <span>Verifying…</span>
                   </>
                 ) : (
                   <>
@@ -177,13 +237,13 @@ export function VerificationModal({
 
             <div>
               <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Claim Confirmed • 100% Match
+                Claim Confirmed
               </span>
               <h4 className="text-xl font-extrabold text-slate-900 mt-2">
                 Ownership Verified Successfully!
               </h4>
               <p className="text-xs text-slate-600 mt-1 max-w-sm mx-auto">
-                Your credentials have been authenticated. Your item is staged for immediate contactless
+                Your answers matched closely enough to confirm ownership. Your item is staged for
                 pickup.
               </p>
             </div>

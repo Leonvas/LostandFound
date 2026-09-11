@@ -159,6 +159,75 @@ def get_matches_for_lost_report(report_id: str):
     matches = supabase.rpc("find_matches_for_lost", {"report_id": report_id}).execute()
     return matches.data
 
+@app.get("/verification-fields")
+def get_verification_fields(category: str):
+    rows = (supabase.table("category_verification_fields")
+            .select("field_key,label,field_type,weight")
+            .eq("category", category).execute().data)
+    if not rows:
+        rows = (supabase.table("category_verification_fields")
+                .select("field_key,label,field_type,weight")
+                .eq("category", "default").execute().data)
+    return rows
+
+@app.get("/found-items/{item_id}/verification-schema")
+def get_item_verification_schema(item_id: str):
+    item = supabase.table("found_items").select("category").eq("id", item_id).single().execute().data
+    return get_verification_fields(item["category"])
+
+class VerifyClaimIn(BaseModel):
+    lost_report_id: str
+    found_item_id: str
+    claimant_user_id: str | None = None
+    answers: dict[str, str]
+
+from difflib import SequenceMatcher
+
+def similarity(a: str, b: str) -> float:
+    a, b = (a or "").strip().lower(), (b or "").strip().lower()
+    return SequenceMatcher(None, a, b).ratio() if a and b else 0.0
+
+@app.post("/verify-claim")
+def verify_claim(payload: VerifyClaimIn):
+    item = (supabase.table("found_items").select("private_attributes,category")
+            .eq("id", payload.found_item_id).single().execute().data)
+    if not item:
+        raise HTTPException(404, "Found item not found")
+
+    schema = (supabase.table("category_verification_fields")
+              .select("field_key,weight").eq("category", item["category"]).execute().data)
+    private = item.get("private_attributes") or {}
+
+    field_scores, weighted_sum, weight_total = {}, 0.0, 0
+    for f in schema:
+        truth = private.get(f["field_key"])
+        if not truth:
+            continue  # finder left this one blank — don't penalize claimant for it
+        score = similarity(truth, payload.answers.get(f["field_key"], ""))
+        field_scores[f["field_key"]] = round(score, 2)
+        weighted_sum += score * f["weight"]
+        weight_total += f["weight"]
+
+    overall = round(weighted_sum / weight_total, 2) if weight_total else 0.0
+    critical_fail = any(s < 0.3 for s in field_scores.values())
+    passed = overall >= 0.65 and not critical_fail
+
+    supabase.table("verification_attempts").insert({
+        "lost_report_id": payload.lost_report_id,
+        "found_item_id": payload.found_item_id,
+        "claimant_user_id": payload.claimant_user_id,
+        "answers": payload.answers,
+        "field_scores": field_scores,
+        "overall_score": overall,
+        "passed": passed,
+    }).execute()
+
+    if passed:
+        supabase.table("found_items").update(
+            {"status": "claimed", "matched_report_id": payload.lost_report_id}
+        ).eq("id", payload.found_item_id).execute()
+
+    return {"passed": passed, "overall_score": overall, "field_scores": field_scores}
 
 @app.get("/found-items/{item_id}")
 def get_found_item(item_id: str):

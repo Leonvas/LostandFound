@@ -1,6 +1,7 @@
 import { LostItemReport, FoundItemAsset, AttributeMatchVector, NotificationItem, RecoveryCenter } from '../types';
 
 export const CURRENT_USER = {
+  id: 'user-nyu-99420',
   name: 'Alex',
   netId: 'node-nyu-99420',
   role: 'Student (Computer Science & Design)',

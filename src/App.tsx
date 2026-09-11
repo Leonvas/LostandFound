@@ -387,12 +387,13 @@ export default function App() {
       <Footer onNavigate={(screen) => setCurrentScreen(screen)} />
 
       {/* Modals */}
-      <VerificationModal
-        isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
-        foundItem={verifyTargetItem ?? EMPTY_FOUND_ITEM}
-        onVerificationSuccess={handleVerificationSuccess}
-      />
+  <VerificationModal
+  isOpen={isVerifyModalOpen}
+  onClose={() => setIsVerifyModalOpen(false)}
+  lostReport={inspectedLostReport ?? EMPTY_LOST_REPORT}
+  foundItem={verifyTargetItem ?? EMPTY_FOUND_ITEM}
+  onVerificationSuccess={handleVerificationSuccess}
+/>
 
       <MatchMatrixModal
         isOpen={isMatrixModalOpen}
