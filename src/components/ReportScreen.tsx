@@ -1,5 +1,6 @@
-import { useState, FormEvent } from 'react';
+import { useState, useRef, FormEvent, ChangeEvent } from 'react';
 import { ScreenType, LostItemReport } from '../types';
+import { uploadItemPhoto } from '../lib/uploadPhoto';
 import {
   ShieldCheck,
   Zap,
@@ -17,6 +18,8 @@ import {
   ArrowLeft,
   Save,
   HelpCircle,
+  Loader2,
+  X,
 } from 'lucide-react';
 
 interface ReportScreenProps {
@@ -45,6 +48,10 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
   );
   const [hasPhoto, setHasPhoto] = useState(false);
   const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeStep, setActiveStep] = useState(2); // In image, step 1 & 2 are in view
 
@@ -66,6 +73,39 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
   };
 
   const confidenceScore = calculateConfidence();
+
+  const handlePhotoButtonClick = () => {
+    setHasPhoto(true);
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file later
+    if (!file) return;
+
+    setPhotoError(null);
+    setSelectedFileName(file.name);
+    setIsUploadingPhoto(true);
+
+    try {
+      const url = await uploadItemPhoto(file, 'lost');
+      setUploadedPhotoUrl(url);
+      setHasPhoto(true);
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      setPhotoError('Could not upload that photo. Please try again.');
+      setSelectedFileName(null);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setUploadedPhotoUrl(null);
+    setSelectedFileName(null);
+    setPhotoError(null);
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -505,7 +545,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Option A: Upload Photo */}
             <div
-              onClick={() => setHasPhoto(true)}
+              onClick={handlePhotoButtonClick}
               className={`p-5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
                 hasPhoto
                   ? 'border-blue-600 bg-blue-50/40 shadow-xs'
@@ -523,11 +563,59 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
                   Drag and drop a reference image or receipt from your device.
                 </p>
 
-                <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors">
-                  <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
-                  <div className="text-xs font-semibold text-slate-700">PNG, JPG or HEIC up to 15MB</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Click to browse device</div>
-                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/heic,image/heif"
+                  className="hidden"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={handlePhotoFileChange}
+                />
+
+                {uploadedPhotoUrl ? (
+                  <div
+                    className="border border-slate-200 rounded-lg p-3 bg-white flex items-center gap-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <img
+                      src={uploadedPhotoUrl}
+                      alt="Selected item preview"
+                      className="w-12 h-12 rounded-md object-cover border border-slate-200 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-slate-700 truncate">
+                        {selectedFileName || 'Photo uploaded'}
+                      </div>
+                      <div className="text-[10px] text-emerald-600 font-medium">Uploaded successfully</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-300 rounded-lg p-4 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors">
+                    {isUploadingPhoto ? (
+                      <>
+                        <Loader2 className="w-6 h-6 text-blue-500 mx-auto mb-1.5 animate-spin" />
+                        <div className="text-xs font-semibold text-slate-700">Uploading photo…</div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6 text-slate-400 mx-auto mb-1.5" />
+                        <div className="text-xs font-semibold text-slate-700">PNG, JPG or HEIC up to 15MB</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Click to browse device</div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {photoError && (
+                  <div className="text-[11px] text-red-600 font-medium mt-2">{photoError}</div>
+                )}
               </div>
 
               <div className="text-[11px] text-slate-400 mt-3 pt-2 border-t border-slate-100">
@@ -620,7 +708,7 @@ export function ReportScreen({ onNavigate, onSubmitReport }: ReportScreenProps) 
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingPhoto}
               className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs sm:text-sm px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-sm transition-all hover:shadow-blue-500/25 cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (

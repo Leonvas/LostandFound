@@ -1,5 +1,6 @@
-import { useState, FormEvent } from 'react';
-import { HandHeart, X, Camera, MapPin, Building, Award, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useState, useRef, FormEvent, ChangeEvent } from 'react';
+import { HandHeart, X, Camera, MapPin, Building, Award, CheckCircle2, ArrowRight, Upload, Loader2 } from 'lucide-react';
+import { uploadItemPhoto } from '../lib/uploadPhoto';
 
 interface FoundReportModalProps {
   isOpen: boolean;
@@ -16,7 +17,41 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Photo upload state
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoFileName, setPhotoFileName] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   if (!isOpen) return null;
+
+  const handlePhotoFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setPhotoError(null);
+    setPhotoFileName(file.name);
+    setIsUploadingPhoto(true);
+
+    try {
+      const url = await uploadItemPhoto(file, 'found');
+      setPhotoUrl(url);
+    } catch (err) {
+      console.error('Photo upload failed:', err);
+      setPhotoError('Could not upload that photo. Please try again.');
+      setPhotoFileName(null);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl(null);
+    setPhotoFileName(null);
+    setPhotoError(null);
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -30,6 +65,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
         category,
         location: `${location} - ${room}`,
         custodian: handoverPref,
+        photoUrl: photoUrl || undefined,
       });
     }, 700);
   };
@@ -145,6 +181,65 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
               </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1">
+                Add a Photo (optional)
+              </label>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/heic,image/heif"
+                className="hidden"
+                onChange={handlePhotoFileChange}
+              />
+
+              {photoUrl ? (
+                <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50 flex items-center gap-3">
+                  <img
+                    src={photoUrl}
+                    alt="Found item preview"
+                    className="w-10 h-10 rounded-md object-cover border border-slate-200 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-700 truncate">
+                      {photoFileName || 'Photo uploaded'}
+                    </div>
+                    <div className="text-[10px] text-emerald-600 font-medium">Uploaded successfully</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-slate-400 hover:text-slate-700 p-1 rounded-md hover:bg-slate-100 shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingPhoto}
+                  className="w-full border border-dashed border-slate-300 rounded-lg p-3 text-center bg-slate-50/60 hover:bg-slate-50 transition-colors flex flex-col items-center gap-1 cursor-pointer disabled:opacity-60"
+                >
+                  {isUploadingPhoto ? (
+                    <>
+                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                      <span className="text-xs font-semibold text-slate-700">Uploading photo…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5 text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-700">Click to select a photo</span>
+                      <span className="text-[10px] text-slate-400">PNG, JPG or HEIC up to 15MB</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {photoError && <div className="text-[11px] text-red-600 font-medium mt-1.5">{photoError}</div>}
+            </div>
+
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <button
                 type="button"
@@ -156,7 +251,7 @@ export function FoundReportModal({ isOpen, onClose, onSuccess }: FoundReportModa
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingPhoto}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
